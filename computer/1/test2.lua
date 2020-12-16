@@ -1,0 +1,5 @@
+mio = require("/tools/modelIO")
+m = require("/tools/moveModule")
+blocks = mio.loadModelFile("/models/treeModel.txt")
+m.set(-352, 73, 14, 3)
+m.moveInXYZGrid(-351, 70, 14)
