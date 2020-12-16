@@ -1,13 +1,11 @@
 inv = require("/tools/inventory")
 storage = nil
-
-position = 4
-targetID = 1
+targetID = 27
 
 function executeImportTask(colorCode)
   turtle.select(1)
   print(colorCode)
-  storage.retrieve("enderstorage:ender_storage", 0, 1, position, colorCode)
+  storage.retrieve("enderstorage:ender_storage", 0, 1, 9, colorCode)
   turtle.placeUp()
   while turtle.suckUp() do
   end
@@ -19,23 +17,25 @@ end
 
 function executeExportTask (colorCode, blockRequest)
   turtle.select(1)
-  print(colorCode)
-  storage.retrieve("enderstorage:ender_storage", 0, 1, position, colorCode)
+  storage.retrieve("enderstorage:ender_storage", 0, 1, 9, colorCode)
   turtle.placeUp()
   for id, data in pairs(blockRequest) do
     if data.nbt ~= nil then
-      storage.retrieve(id, data.metadata, data.amount, position, data.nbt)
+      storage.retrieve(id, data.metadata, data.amount, 9, data.nbt)
     else
-      storage.retrieve(id, data.metadata, data.amount, position)
+      storage.retrieve(id, data.metadata, data.amount, 9)
     end
     inv.dropAll("up")  
   end
   turtle.digUp()
-  turtle.dropDown()       
+  turtle.dropDown()      
 end
  
 storage = peripheral.wrap("front") 
 rednet.open("left")
+rednet.broadcast(os.getComputerLabel(), "register")
+rednet.host("storageBots", "storageBot")
+dispatcher = rednet.lookup("storageDispatcher")
 --print("Got response from computer " .. dispatcher)
  
 while 1 == 1 do
@@ -44,8 +44,8 @@ while 1 == 1 do
     if protocol == "export" then
       rednet.close("left")
       ok, err = pcall(executeExportTask,
-        message["colorCode"], 
-        message["blockRequest"])
+          message["colorCode"], 
+          message["blockRequest"])
       rednet.open("left")
       rednet.send(targetID, "", "export")
       if not ok then
@@ -54,7 +54,7 @@ while 1 == 1 do
     elseif protocol == "import" then
       rednet.close("left")
       ok, err = pcall(executeImportTask,
-          message.colorCode)
+        message.colorCode)
       rednet.open("left") 
       rednet.send(targetID, "", "import")
     end
