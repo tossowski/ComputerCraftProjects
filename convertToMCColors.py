@@ -4,7 +4,7 @@ from matplotlib import pyplot as plt
 filename = sys.argv[1]
 image = skimage.io.imread(filename)
 
-print(image.shape)
+# Converts rgb image to minecraft 16 color concrete spectrum
 
 color_to_block = {(228,228,228):"white",
 (160,167,167):"light gray",
