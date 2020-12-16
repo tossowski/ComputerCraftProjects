@@ -67,7 +67,7 @@ colors = {(127, 178, 56):["minecraft:grass", 0],
           (142, 60, 46):["minecraft:stained_hardened_clay", 14],
           (37, 22, 16):["minecraft:stained_hardened_clay", 15]}
 
-#north: negative Z = up on image
+# north: negative Z = up on image
 # east: positive X = right on image
 
 # bright = go down 1 y
