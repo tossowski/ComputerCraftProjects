@@ -10,7 +10,7 @@ We use the [Cubic Chunks Mod](https://www.curseforge.com/minecraft/mc-mods/openc
 
 * Use a [voxelizer](https://drububu.com/miscellaneous/voxelizer/?out=obj) to convert the 3D model to voxels.
 
-<img src="Pictures/ivysaur.png" height="250">  <img src="Pictures/ivysaur_voxelized.png" height="250">
+<img src="Pictures/Ivysaur.png" height="250">  <img src="Pictures/Ivysaur_Voxelized.png" height="250">
 
 During this step, the model is transformed so that it can be represented as a .txt file. Each line of the .txt file represents a single voxel and has the following format:
 `voxel_x_location, voxel_y_location, voxel_z_location, voxel_color`
