@@ -21,7 +21,7 @@ The goal of this step is to reduce the number of colors in order to simplify the
 
 The code used to reduce the number of colors is shown below. The main idea is to use KMeans to identify colors that are important in the picture, and replace each pixel with the closest cluster center/color. We represent colors with RGB tuples, and use Euclidian distance as our distance metric:
 
-```
+```python
 """
 This function reduces the number of colors in an image. It takes in 2 arguments:
 img: The image to pixelate
