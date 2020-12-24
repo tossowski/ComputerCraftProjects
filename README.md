@@ -36,4 +36,4 @@ The goal of this step is to reduce the number of colors in order to simplify the
 # Orientation and Placement #
 * Finally, start the building turtle at the desired location
 
-
+<img src="Pictures/All_pokemon.png" height="250">
