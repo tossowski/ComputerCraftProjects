@@ -2,6 +2,10 @@ This repository contains the code used to program ComputerCraft turtles to build
 
 <img src="Pictures/DragonShaders.png" height="200"> <img src="Pictures/BulbasaurIvysaur.png" height="200">
 
+The repository also contains a customized isometric map viewer which can render cubic chunks worlds (WIP). More details on this in the MapProgram folder. Here is an example render:
+
+<img src="Pictures/MapExample.png" height="300"> 
+
 We use the [Cubic Chunks Mod](https://www.curseforge.com/minecraft/mc-mods/opencubicchunks) so that 3D models of any size can be built in the minecraft world. We also use the [OpenBlocks Mod](https://www.curseforge.com/minecraft/mc-mods/openblocks) to allow for any color to be used to texture the models. Given an 3D model, the following is the process we use to convert it to a voxelized 3D model in a minecraft world:
 
 # Voxelization #

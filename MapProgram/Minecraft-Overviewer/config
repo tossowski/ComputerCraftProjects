@@ -1,0 +1,9 @@
+#worlds["My world"] = "/mnt/c/Users/tosso/AppData/Roaming/.minecraft/saves/Vanilla1_12"
+worlds["My world"] = "/mnt/c/Users/tosso/Desktop/AT/instances/MysticsCubicChunksModpack/saves/world"
+
+renders["normalrender"] = {
+    "world": "My world",
+    "title": "Normal Render of My World",
+}
+
+outputdir = "./outputs"
