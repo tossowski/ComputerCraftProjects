@@ -77,4 +77,4 @@ The paint making process is quite involved, making use of a main computercraft t
 # Orientation and Placement #
 * Finally, start the building turtle at the desired location
 
-
+<img src="Pictures/AllPokemon.png" height="250">
