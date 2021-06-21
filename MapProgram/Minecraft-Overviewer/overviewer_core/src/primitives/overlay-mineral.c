@@ -57,7 +57,7 @@ static void get_color(void* data, RenderState* state,
     *a = 0;
 
     y_max = state->y + 1;
-    for (y = state->chunky * -16; y <= y_max; y++) {
+    for (y = (state->chunky % 16) * -16; y <= y_max; y++) {
         int32_t i, tmp;
         mc_block_t block = get_data(state, BLOCKS, x, y, z);
 

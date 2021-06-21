@@ -27,16 +27,16 @@ walk_chunk(RenderState* state, RenderPrimitiveNether* data) {
 
     for (x = -1; x < WIDTH + 1; x++) {
         for (z = -1; z < DEPTH + 1; z++) {
-            blockid = get_data(state, BLOCKS, x, NETHER_ROOF - (state->chunky * 16), z);
+            blockid = get_data(state, BLOCKS, x, NETHER_ROOF - (state->chunky % 16 * 16), z);
             if (blockid == block_bedrock) {
                 data->remove_block[x + 1][NETHER_ROOF][z + 1] = true;
-                blockid = get_data(state, BLOCKS, x, (NETHER_ROOF + 1) - (state->chunky * 16), z);
+                blockid = get_data(state, BLOCKS, x, (NETHER_ROOF + 1) - (state->chunky % 16 * 16), z);
                 if (blockid == block_brown_mushroom || blockid == block_red_mushroom)
                     data->remove_block[x + 1][NETHER_ROOF + 1][z + 1] = true;
             }
 
             for (y = NETHER_ROOF - 1; y >= 0; y--) {
-                blockid = get_data(state, BLOCKS, x, y - (state->chunky * 16), z);
+                blockid = get_data(state, BLOCKS, x, y - (state->chunky % 16 * 16), z);
                 if (block_class_is_subset(blockid, block_class_nether_roof, block_class_nether_roof_len))
                     data->remove_block[x + 1][y][z + 1] = true;
                 else
@@ -57,7 +57,7 @@ nether_hidden(void* data, RenderState* state, int32_t x, int32_t y, int32_t z) {
     if (!(self->walked_chunk))
         walk_chunk(state, self);
 
-    real_y = y + (state->chunky * 16);
+    real_y = y + (state->chunky % 16 * 16);
     return self->remove_block[x + 1][real_y][z + 1];
 }
 

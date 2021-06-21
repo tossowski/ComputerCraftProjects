@@ -485,7 +485,7 @@ def main():
             w = worldcache[render['world']]
         except KeyError:
             try:
-                w = world.World(render['world'])
+                w = world.World(render['world'], northdirection = render['northdirection'])
             except CorruptNBTError as e:
                 logging.error("Failed to open world %r.", render['world'])
                 raise e
@@ -539,12 +539,12 @@ def main():
 
         # If this is to be a rotated regionset, wrap it in a RotatedRegionSet
         # object
-        if (render['northdirection'] > 0):
-            newrsets = []
-            for r in rsets:
-                r = world.RotatedRegionSet(r, render['northdirection'])
-                newrsets.append(r)
-            rsets = newrsets
+        #if (render['northdirection'] > 0):
+        newrsets = []
+        for r in rsets:
+            r = world.RotatedRegionSet(r, render['northdirection'])
+            newrsets.append(r)
+        rsets = newrsets
 
         ###############################
         # Do the final prep and create the TileSet object

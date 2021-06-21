@@ -4,6 +4,8 @@ worlds["My world"] = "/mnt/c/Users/tosso/Desktop/AT/instances/MysticsCubicChunks
 renders["normalrender"] = {
     "world": "My world",
     "title": "Normal Render of My World",
+    "northdirection": "upper-right",
+    "rendermode":smooth_lighting
 }
 
 outputdir = "./outputs"

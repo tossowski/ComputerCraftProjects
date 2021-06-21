@@ -48,7 +48,7 @@ static void
 height_fading_draw(void* data, RenderState* state, PyObject* src, PyObject* mask, PyObject* mask_light) {
     float alpha;
     PrimitiveHeightFading* self = (PrimitiveHeightFading*)data;
-    int32_t y = 16 * state->chunky + state->y;
+    int32_t y = 16 * (state->chunky % 16) + state->y;
 
     /* do some height fading */
     PyObject* height_color = self->white_color;

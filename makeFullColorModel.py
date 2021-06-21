@@ -9,7 +9,7 @@ levels = {}
 colors = []
 blocks = []
 
-fileName = "models/blastoise.txt"
+fileName = "models/beedrill.txt"
 
 def dist(c1, c2):
     total = 0
@@ -90,7 +90,7 @@ for i in range(numYLevels):
     currBlock[1] += 1
     
 
-with open("blastoiseModel.txt", "w") as f:
+with open("finalModels/beedrillModel.txt", "w") as f:
     for block in final_path:
         blockname = block[3]
         f.write(str(block[0]))

@@ -25,8 +25,8 @@ netherold_hidden(void* data, RenderState* state, int32_t x, int32_t y, int32_t z
        empty sections as 'solid'
     */
     bool missing_section = false;
-    while (y < (SECTIONS_PER_CHUNK - state->chunky) * 16) {
-        if (state->chunks[1][1].sections[state->chunky + (y / 16)].blocks == NULL) {
+    while (y < (SECTIONS_PER_CHUNK - state->chunky % 16) * 16) {
+        if (state->chunks[1][1].sections[state->chunky % 16 + (y / 16)].blocks == NULL) {
             missing_section = true;
             y += 16;
             continue;

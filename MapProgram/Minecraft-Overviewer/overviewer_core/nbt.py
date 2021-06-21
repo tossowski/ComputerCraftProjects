@@ -286,11 +286,20 @@ class MCRFileReader(object):
         modulo'd into this range (x % 32, etc.) This is so you can
         provide chunk coordinates in global coordinates, and still
         have the chunks load out of regions properly."""
+        
         x = x % 16
         y = y % 16
         z = z % 16
+
+        location = 0
+
+        try:
+            location = self._locations[int(x * 256 + y * 16 + z)]
+        except:
+            print("shit")
+            return None
         
-        location = self._locations[int(x * 256 + y * 16 + z)]
+        #location = self._locations[int(x * 256 + y * 16 + z)]
         offset = (location >> 8) * 512
         sectors = location & 0xff
 
@@ -323,6 +332,7 @@ class MCRFileReader(object):
             # _, d = NBTFileReader(data, is_gzip=is_gzip).read_all()
             # if d['Level']['y'] not in [0,4,8,12]:
             #     print(d['Level']['y'])
+
             return NBTFileReader(data, is_gzip=is_gzip).read_all()
         except CorruptionError:
             raise

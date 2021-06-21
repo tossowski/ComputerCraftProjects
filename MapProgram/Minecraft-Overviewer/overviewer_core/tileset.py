@@ -969,14 +969,18 @@ class TileSet(object):
             except OSError as e:
                 # Ignore errors if it's "file doesn't exist"
                 if e.errno != errno.ENOENT:
-                    raise
-            logging.warning(
-                "Tile %s was requested for render, but no children were found! "
-                "This is probably a bug.", imgpath)
+                    pass
+            #         raise
+            # logging.warning(
+            #     "Tile %s was requested for render, but no children were found! "
+            #     "This is probably a bug.", imgpath)
             return
 
         # Create the actual image now
+        # Original:
+        # img = Image.new("RGBA", (384, 384), self.options['bgcolor'])
         img = Image.new("RGBA", (384, 384), self.options['bgcolor'])
+
         # We'll use paste (NOT alpha_over) for quadtree generation because
         # this is just straight image stitching, not alpha blending
         for path in quadPath_filtered:
@@ -986,6 +990,9 @@ class TileSet(object):
                 if src.mode != "RGB" and src.mode != "RGBA":
                     src = src.convert("RGBA")
                 src.load()
+
+                # Original
+                # quad = Image.new("RGBA", (192, 192), self.options['bgcolor'])
 
                 quad = Image.new("RGBA", (192, 192), self.options['bgcolor'])
                 resize_half(quad, src)
@@ -1047,8 +1054,8 @@ class TileSet(object):
 
         if not chunks:
             # No chunks were found in this tile
-            logging.warning("%s was requested for render, but no chunks found! "
-                            "This may be a bug.", tile)
+            # logging.warning("%s was requested for render, but no chunks found! "
+            #                 "This may be a bug.", tile)
             # print(self.regionset._r.rel)
             try:
                 os.unlink(imgpath)
@@ -1084,8 +1091,7 @@ class TileSet(object):
             
         for col, row, chunkx, chunky, chunkz, chunk_mtime in chunks:
             xpos = -192 + (col - colstart) * 192
-            ypos = -96 + (row - rowstart) * 96 + (16 - 1 - chunky) * 192
-
+            ypos = -96 + (row - rowstart) * 96 + (16 - 1 - chunky % 16) * 192
             if chunk_mtime > max_chunk_mtime:
                 max_chunk_mtime = chunk_mtime
 
@@ -1096,6 +1102,7 @@ class TileSet(object):
                 # if chunkx == 54 and chunkz == 14:
                 # if chunky == 16:
                 #     print("Asdfasdfasdf")
+
                 c_overviewer.render_loop(
                     self.world, self.regionset, chunkx, chunky, chunkz, tileimg, xpos, ypos,
                     self.options['rendermode'], self.textures)
@@ -1366,87 +1373,83 @@ def get_chunks_by_tile(tile, regionset):
 
     # Each tile has two even columns and an odd column of chunks.
 
-    chunks_above_16 = 16
-    above_16_odd = []
-    above_16_even = []
+    MAX_REGION_Y = 15
+    eveniters = []
+    odditers = []
+
 
 
     # First do the odd. For each chunk in the tile's odd column the tile
     # "passes through" three chunk sections.
-    oddcol_sections = []
-    for i, y in enumerate(reversed(range(16))):
-        for row in range(tile.row + 3 - i * 2 , tile.row - 2 - i * 2, -2):
-            oddcol_sections.append((tile.col + 1, row, y))
+    for k in range(MAX_REGION_Y):
+        oddcol_sections = []
+        for i, y in enumerate(reversed(range(16*k, 16*(k+1)))):
+            for row in range(tile.row + 3 - i * 2  , tile.row - 2 - i * 2, -2):
+                oddcol_sections.append((tile.col + 1, row, y))
 
-    evencol_sections = []
-    for i, y in enumerate(reversed(range(16))):
-        for row in range(tile.row + 4 - i * 2 , tile.row - 3 - i * 2, -2):
-            evencol_sections.append((tile.col + 2, row, y))
-            evencol_sections.append((tile.col, row, y))
+        evencol_sections = []
+        for i, y in enumerate(reversed(range(16*k, 16*(k+1)))):
+            for row in range(tile.row + 4 - i * 2, tile.row - 3 - i * 2, -2):
+                evencol_sections.append((tile.col + 2, row, y))
+                evencol_sections.append((tile.col, row, y))
 
-
-    for i, y in enumerate(reversed(range(16,32))):
-        for row in range(tile.row + 3 - i * 2 + 2 * chunks_above_16 , tile.row - 2 - i * 2 + 2 * chunks_above_16, -2):
-            above_16_odd.append((tile.col + 1, row, y))
-
-    for i, y in enumerate(reversed(range(16,32))):
-        for row in range(tile.row + 4 - i * 2 + 2 * chunks_above_16 , tile.row - 3 - i * 2 + 2 * chunks_above_16, -2):
-            above_16_even.append((tile.col + 2, row, y))
-            above_16_even.append((tile.col, row, y))
-
-    eveniter = reversed(evencol_sections)
-    odditer = reversed(oddcol_sections)
-    above_16_odd = reversed(above_16_odd)
-    above_16_even = reversed(above_16_even)
+        eveniter = reversed(evencol_sections)
+        odditer = reversed(oddcol_sections)
+        eveniters.append(eveniter)
+        odditers.append(odditer)
 
 
     # There are 4 rows of chunk sections per Y value on even columns, but 3
     # rows on odd columns. This iteration order yields them in back-to-front
     # order appropriate for rendering
-    for col, row, y in roundrobin((
-            eveniter, eveniter,
-            odditer,
-            eveniter, eveniter,
-            odditer,
-            eveniter, eveniter,
-            odditer,
-            eveniter, eveniter,)):
-        chunkx, chunkz = unconvert_coords(col, row)
+
+    for k in range(MAX_REGION_Y):
+        eveniter = eveniters[k]
+        odditer = odditers[k]
+        for col, row, y in roundrobin((
+                eveniter, eveniter,
+                odditer,
+                eveniter, eveniter,
+                odditer,
+                eveniter, eveniter,
+                odditer,
+                eveniter, eveniter,)):
+            chunkx, chunkz = unconvert_coords(col, row)
+
+
+            
+            mtime = get_mtime(chunkx, y, chunkz)
+            # if (tile.col == 0 and tile.row == 4):
+            #     print(chunkx, y, chunkz, mtime)
+            if mtime is not None:
+                # print(chunkx, chunkz, y)
+                # print(col, row, chunkx, chunkz)
+
+                    
+                yield (col, row, chunkx, y, chunkz, mtime)
+
+
+    # for col, row, y in roundrobin((
+    #         above_16_even, above_16_even,
+    #         above_16_odd,
+    #          above_16_even, above_16_even,
+    #         above_16_odd,
+    #          above_16_even, above_16_even,
+    #         above_16_odd,
+    #          above_16_even, above_16_even,)):
+    #     chunkx, chunkz = unconvert_coords(col, row)
 
 
         
-        mtime = get_mtime(chunkx, y, chunkz)
-        # if (tile.col == 0 and tile.row == 4):
-        #     print(chunkx, y, chunkz, mtime)
-        if mtime is not None:
-            # print(chunkx, chunkz, y)
-            # print(col, row, chunkx, chunkz)
+    #     mtime = get_mtime(chunkx, y, chunkz)
+    #     # if (tile.col == 0 and tile.row == 4):
+    #     #     print(chunkx, y, chunkz, mtime)
+    #     if mtime is not None:
+    #         # print(chunkx, chunkz, y)
+    #         # print(col, row, chunkx, chunkz)
 
                 
-            yield (col, row, chunkx, y, chunkz, mtime)
-
-
-    for col, row, y in roundrobin((
-            above_16_even, above_16_even,
-            above_16_odd,
-             above_16_even, above_16_even,
-            above_16_odd,
-             above_16_even, above_16_even,
-            above_16_odd,
-             above_16_even, above_16_even,)):
-        chunkx, chunkz = unconvert_coords(col, row)
-
-
-        
-        mtime = get_mtime(chunkx, y, chunkz)
-        # if (tile.col == 0 and tile.row == 4):
-        #     print(chunkx, y, chunkz, mtime)
-        if mtime is not None:
-            # print(chunkx, chunkz, y)
-            # print(col, row, chunkx, chunkz)
-
-                
-            yield (col, row, chunkx, y, chunkz, mtime)
+    #         yield (col, row, chunkx, y, chunkz, mtime)
 
 
 class RendertileSet(object):

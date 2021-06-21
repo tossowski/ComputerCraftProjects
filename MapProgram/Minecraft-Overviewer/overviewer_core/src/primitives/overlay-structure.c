@@ -59,7 +59,7 @@ static void get_color(void* data,
     // iterate over all the colors
     for (col = 0; col < self->numcolors; col++) {
         // iterate over all y levels
-        for (y = state->chunky * -16; y <= y_max; y++) {
+        for (y = (state->chunky % 16) * -16; y <= y_max; y++) {
             // iterate over all the conditions
             for (cond = 0; cond < structures[col].numconds; cond++) {
                 all = true;

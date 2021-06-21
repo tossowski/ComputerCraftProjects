@@ -79,7 +79,8 @@ PyObject* resize_half_wrap(PyObject* self, PyObject* args);
 typedef struct _RenderMode RenderMode;
 
 /* in iterate.c */
-#define SECTIONS_PER_CHUNK 32
+#define SECTIONS_PER_CHUNK 18 // 18 to fix smooth lighting across vertical cubic chunks regions
+
 typedef struct {
     /* whether this chunk is loaded: use load_chunk to load */
     int32_t loaded;
@@ -162,11 +163,11 @@ typedef enum {
     BIOMES,
 } DataType;
 static inline uint32_t get_data(RenderState* state, DataType type, int32_t x, int32_t y, int32_t z) {
-    int32_t chunkx = 1, chunky = state->chunky, chunkz = 1;
+    int32_t chunkx = 1, chunky = state->chunky % 16 + 1, chunkz = 1;
     PyArrayObject* data_array = NULL;
     uint32_t def = 0;
     if (type == SKYLIGHT)
-        def = 15;
+        def = 0;
 
     if (x >= 16) {
         x -= 16;
@@ -195,8 +196,11 @@ static inline uint32_t get_data(RenderState* state, DataType type, int32_t x, in
         return def;
 
     if (!(state->chunks[chunkx][chunkz].loaded)) {
-        if (load_chunk(state, chunkx - 1, chunky - 1, chunkz - 1, 0))
-            return def;
+        //printf("Hello World\n");
+        load_chunk(state, chunkx - 1, chunky - 1, chunkz - 1, 0);
+        // if (load_chunk(state, chunkx - 1, chunky - 1, chunkz - 1, 0)) 
+        //     return def;
+            
     }
 
     switch (type) {
@@ -216,8 +220,11 @@ static inline uint32_t get_data(RenderState* state, DataType type, int32_t x, in
         data_array = state->chunks[chunkx][chunkz].biomes;
     };
 
-    if (data_array == NULL)
+    
+    if (data_array == NULL) {
         return def;
+    }
+        
 
     if (type == BLOCKS)
         return getArrayShort3D(data_array, x, y, z);
@@ -228,6 +235,8 @@ static inline uint32_t get_data(RenderState* state, DataType type, int32_t x, in
             return getArrayByte2D(data_array, x, z);
         }
     }
+
+    
     return getArrayByte3D(data_array, x, y, z);
 }
 

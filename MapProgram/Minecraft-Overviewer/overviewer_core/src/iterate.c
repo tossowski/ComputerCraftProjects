@@ -127,16 +127,13 @@ static inline void load_chunk_section(ChunkData* dest, int32_t i, PyObject* sect
 bool load_chunk(RenderState* state, int32_t x, int32_t y, int32_t z, uint8_t required) {
     ChunkData* dest = &(state->chunks[1 + x][1 + z]);
     int32_t i;
+    int32_t start_y;
     PyObject* chunk = NULL;
     PyObject* sections = NULL;
-    PyObject* ycoord = NULL;
     PyObject* section = NULL;
-    // PyObject* tileEntities = NULL;
-    // PyObject* tileEntity = NULL;
-    // PyObject* paintedBlockState = NULL;
-    // PyObject* background = NULL;
-    // int32_t color;
-    // PyArrayObject* colors = NULL;
+    PyObject *args = NULL;  
+    PyObject *keywords = NULL;
+
 
 
     // if (dest->loaded)
@@ -159,67 +156,72 @@ bool load_chunk(RenderState* state, int32_t x, int32_t y, int32_t z, uint8_t req
     x += state->chunkx;
     z += state->chunkz;
 
+    start_y = (16 + (state->chunky % 16)) % 16 + 1;
+    //start_y = (state->chunky / 16) * 16 - 1;
+    
+    // load chunk below and above to make smooth lighting work
+    for (i = -1; i < 2; i++) {
+        
+        if (start_y + i > 16 || start_y + i == 0) {
+            args = Py_BuildValue("iii", x, state->chunky + i, z);    
+            keywords = PyDict_New();
 
-    chunk = PyObject_CallMethod(state->regionset, "get_chunk", "iii", x, state->chunky, z);
+            if (start_y + i > 16) {
+                PyDict_SetItemString(keywords, "offset", PyLong_FromLong(1));
+            } else {
+                PyDict_SetItemString(keywords, "offset", PyLong_FromLong(-1));
+            }
+            
 
-    if (chunk == NULL) {
-            // An exception is already set. RegionSet.get_chunk sets
-            // ChunkDoesntExist
+            chunk = PyObject_Call(PyObject_GetAttrString(state->regionset, "get_chunk"), args, keywords);
+            Py_DECREF(args);
+            Py_DECREF(keywords);
+        } else {
+            chunk = PyObject_CallMethod(state->regionset, "get_chunk", "iii", x, state->chunky + i, z);
+        }
+        
 
+        if (chunk == NULL) {
+                // An exception is already set. RegionSet.get_chunk sets
+                // ChunkDoesntExist
+
+                if (!required) {
+                    PyErr_Clear();
+                }
+                continue;
+            }
+
+        sections = PyDict_GetItemString(chunk, "Sections");
+    
+        if (sections) {
+            sections = PySequence_Fast(sections, "Sections tag was not a list!");
+        }
+
+        if (sections == NULL) {
+            // exception set, again
+
+            Py_DECREF(chunk);
             if (!required) {
                 PyErr_Clear();
             }
-            return false;
+            continue;
         }
 
-    sections = PyDict_GetItemString(chunk, "Sections");
-    
-    if (sections) {
-        sections = PySequence_Fast(sections, "Sections tag was not a list!");
-    }
+        section = PySequence_Fast_GET_ITEM(sections, 0);
 
-    if (sections == NULL) {
-        // exception set, again
+        if (section != NULL) {
+            load_chunk_section(dest, start_y + i, section);
+        }
 
+        Py_DECREF(sections);
+        Py_DECREF(section);
         Py_DECREF(chunk);
-        if (!required) {
-            PyErr_Clear();
-        }
-        return false;
     }
 
-    section = PySequence_Fast_GET_ITEM(sections, 0);
-    // colors = (PyArrayObject*)PyDict_GetItemString(section, "Colors");
-
-    // tileEntities = PyDict_GetItemString(chunk, "TileEntities");
-    // if (tileEntities != NULL) {
-    //     i = 0;
-    //     tileEntity = PySequence_Fast_GET_ITEM(tileEntities, i);
-    //     while (tileEntity != NULL) {
-    //         paintedBlockState = PyDict_GetItemString(tileEntity, "stencilsEast");
-    //         if (paintedBlockState != NULL) {
-    //             int32_t cx = 0;
-    //             int32_t cy = 0;
-    //             int32_t cz = 0;
-    //             background = PyDict_GetItemString(paintedBlockState, "stencilsEast");
-    //             color = PyLong_AsLong(PyDict_GetItemString(background, "Background"));
-    //             printf("%d", color);
-    //             cx = PyLong_AsLong(PyDict_GetItemString(tileEntity, "x")) % 16;
-    //             cy = PyLong_AsLong(PyDict_GetItemString(tileEntity, "y")) % 16;
-    //             cz = PyLong_AsLong(PyDict_GetItemString(tileEntity, "z")) % 16;
-    //             colors[cx][cy][cz] = color;
-
-    //         }   
-    //         i++;
-    //     }
-    // }
-
-    if (section != NULL) {
-        load_chunk_section(dest, state->chunky, section);
-    }
     
 
     return false;
+    
 }
 
 /* helper to unload all loaded chunks */
@@ -402,7 +404,7 @@ generate_pseudo_data(RenderState* state, uint16_t ancilData) {
         /* calculate the global block coordinates of this position */
         wx = (state->chunkx * 16) + x;
         wz = (state->chunkz * 16) + z;
-        wy = (state->chunky * 16) + y;
+        wy = ((state->chunky % 16) * 16) + y;
         /* lilypads orientation is obtained with these magic numbers */
         /* magic numbers obtained from: */
         /* http://llbit.se/?p=1537 */
@@ -604,7 +606,7 @@ chunk_render(PyObject* self, PyObject* args) {
         Py_DECREF(blockmap);
         return NULL;
     }
-    if (state.chunks[1][1].sections[state.chunky].blocks == NULL) {
+    if (state.chunks[1][1].sections[state.chunky % 16 + 1].blocks == NULL) {
         /* this section doesn't exist, let's skeddadle */
         render_mode_destroy(rendermode);
         Py_DECREF(blockmap);
@@ -613,8 +615,8 @@ chunk_render(PyObject* self, PyObject* args) {
     }
 
     /* set blocks_py, state.blocks, and state.blockdatas as convenience */
-    blocks_py = state.blocks = state.chunks[1][1].sections[state.chunky].blocks;
-    state.blockdatas = state.chunks[1][1].sections[state.chunky].data;
+    blocks_py = state.blocks = state.chunks[1][1].sections[state.chunky % 16 + 1].blocks;
+    state.blockdatas = state.chunks[1][1].sections[state.chunky % 16 + 1].data;
 
     /* set up the random number generator again for each chunk
        so tallgrass is in the same place, no matter what mode is used */
@@ -694,7 +696,7 @@ chunk_render(PyObject* self, PyObject* args) {
                     mask_light = PyTuple_GetItem(t, 1);
                     if (state.block == 483) {
                         uint32_t cdata;
-                        cdata = getArrayInt3D(state.chunks[1][1].sections[state.chunky].colors, state.x, state.y, state.z);
+                        cdata = getArrayInt3D(state.chunks[1][1].sections[state.chunky % 16 + 1].colors, state.x, state.y, state.z);
                         t = PyObject_CallMethod(state.textures, "get_canvas_texture", "i", cdata);
                         src = PyTuple_GetItem(t, 0);
                         mask = PyTuple_GetItem(t, 0);

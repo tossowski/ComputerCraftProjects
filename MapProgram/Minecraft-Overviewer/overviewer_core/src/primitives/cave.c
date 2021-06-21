@@ -49,11 +49,11 @@ cave_occluded(void* data, RenderState* state, int32_t x, int32_t y, int32_t z) {
     }
 
     /* special handling for section boundaries */
-    if (x == 0 && (!(state->chunks[0][1].loaded) || state->chunks[0][1].sections[state->chunky].blocks == NULL))
+    if (x == 0 && (!(state->chunks[0][1].loaded) || state->chunks[0][1].sections[state->chunky % 16 + 1].blocks == NULL))
         return true;
-    if (y == 15 && (state->chunky + 1 >= SECTIONS_PER_CHUNK || state->chunks[1][1].sections[state->chunky + 1].blocks == NULL))
+    if (state->chunks[1][1].sections[state->chunky % 16 + 2].blocks == NULL)
         return true;
-    if (z == 15 && (!(state->chunks[1][2].loaded) || state->chunks[1][2].sections[state->chunky].blocks == NULL))
+    if (z == 15 && (!(state->chunks[1][2].loaded) || state->chunks[1][2].sections[state->chunky % 16 + 1].blocks == NULL))
         return true;
 
     return false;
@@ -84,7 +84,7 @@ cave_hidden(void* data, RenderState* state, int32_t x, int32_t y, int32_t z) {
     blockID = getArrayShort3D(state->blocks, x, y, z);
     blockUpID = get_data(state, BLOCKS, x, y + 1, z);
     if (blockID == 9 || blockID == 8 || blockUpID == 9 || blockUpID == 8) {
-        for (dy = y + 1; dy < (SECTIONS_PER_CHUNK - state->chunky) * 16; dy++) {
+        for (dy = y + 1; dy < (SECTIONS_PER_CHUNK - state->chunky % 16) * 16; dy++) {
             /* go up and check for skylight */
             if (get_data(state, SKYLIGHT, x, dy, z) != 0) {
                 return true;

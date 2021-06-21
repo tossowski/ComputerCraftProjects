@@ -49,32 +49,32 @@ exposed_hidden(void* data, RenderState* state, int32_t x, int32_t y, int32_t z) 
     /* If the neighboring section has no block data, ignore exposure from that
      * direction 
      */
-    if (x == 0 && (!(state->chunks[0][1].loaded) || state->chunks[0][1].sections[state->chunky].blocks == NULL)) {
+    if (x == 0 && (!(state->chunks[0][1].loaded) || state->chunks[0][1].sections[state->chunky % 16 + 1].blocks == NULL)) {
         /* No data in -x direction */
         validMinusX = false;
     }
 
-    if (x == 15 && (!(state->chunks[2][1].loaded) || state->chunks[2][1].sections[state->chunky].blocks == NULL)) {
+    if (x == 15 && (!(state->chunks[2][1].loaded) || state->chunks[2][1].sections[state->chunky % 16 + 1].blocks == NULL)) {
         /* No data in +x direction */
         validPlusX = false;
     }
 
-    if (y == 0 && (state->chunky - 1 < 0 || state->chunks[1][1].sections[state->chunky - 1].blocks == NULL)) {
+    if ((state->chunks[1][1].sections[state->chunky % 16].blocks == NULL)) {
         /* No data in -y direction */
         validMinusY = false;
     }
 
-    if (y == 15 && (state->chunky + 1 >= SECTIONS_PER_CHUNK || state->chunks[1][1].sections[state->chunky + 1].blocks == NULL)) {
+    if ((state->chunks[1][1].sections[state->chunky % 16 + 2].blocks == NULL)) {
         /* No data in +y direction */
         validPlusY = false;
     }
 
-    if (z == 0 && (!(state->chunks[1][0].loaded) || state->chunks[1][0].sections[state->chunky].blocks == NULL)) {
+    if (z == 0 && (!(state->chunks[1][0].loaded) || state->chunks[1][0].sections[state->chunky % 16 + 1].blocks == NULL)) {
         /* No data in -z direction */
         validMinusZ = false;
     }
 
-    if (z == 15 && (!(state->chunks[1][2].loaded) || state->chunks[1][2].sections[state->chunky].blocks == NULL)) {
+    if (z == 15 && (!(state->chunks[1][2].loaded) || state->chunks[1][2].sections[state->chunky % 16 + 1].blocks == NULL)) {
         /* No data in +z direction */
         validPlusZ = false;
     }
