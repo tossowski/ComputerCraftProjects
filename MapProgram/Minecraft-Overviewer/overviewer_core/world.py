@@ -93,9 +93,8 @@ class World(object):
 
     """
 
-    def __init__(self, worlddir, northdirection=UPPER_LEFT):
+    def __init__(self, worlddir):
         self.worlddir = worlddir
-        self.northdirection = northdirection
         # This list, populated below, will hold RegionSet files that are in
         # this world
         self.regionsets = []
@@ -143,7 +142,7 @@ class World(object):
                 # construct a regionset object for this
                 rel = os.path.relpath(root, self.worlddir)
                 if os.path.basename(rel) != "poi":
-                    rset = RegionSet(root, rel, self.northdirection )
+                    rset = RegionSet(root, rel)
                     if root == os.path.join(self.worlddir, "region3d"):
                         self.regionsets.insert(0, rset)
                     else:
@@ -258,7 +257,7 @@ class RegionSet(object):
 
     """
 
-    def __init__(self, regiondir, rel, northdirection):
+    def __init__(self, regiondir, rel):
         """Initialize a new RegionSet to access the region files in the given
         directory.
 
@@ -272,7 +271,6 @@ class RegionSet(object):
 
         """
         self.regiondir = os.path.normpath(regiondir)
-        self.northdirection = northdirection
         self.rel = os.path.normpath(rel)
         logging.debug("regiondir is %r" % self.regiondir)
         logging.debug("rel is %r" % self.rel)
@@ -303,6 +301,10 @@ class RegionSet(object):
                 self.regionfiles[(x,y,z)] = (regionfile, os.path.getmtime(regionfile))
             else:
                 logging.debug("Skipping zero-size region file {}".format(regionfile))
+
+        # Modify region file dict keys so the lowest y region file has y = 0
+        
+
 
         self.empty_chunk = [None,None]
         logging.debug("Done scanning regions")
@@ -884,7 +886,7 @@ class RegionSet(object):
 
     # Re-initialize upon unpickling
     def __getstate__(self):
-        return (self.regiondir, self.rel, self.northdirection)
+        return (self.regiondir, self.rel)
     def __setstate__(self, state):
         return self.__init__(*state)
 
@@ -1367,7 +1369,7 @@ class RegionSet(object):
         return (blocks, data_expanded)
 
     #@log_other_exceptions
-    def get_chunk(self, x, y, z, offset = 0):
+    def get_chunk(self, x, y, z):
         """Returns a dictionary object representing the "Level" NBT Compound
         structure for a chunk given its x, z coordinates. The coordinates given
         are chunk coordinates. Raises ChunkDoesntExist exception if the given
@@ -1393,24 +1395,9 @@ class RegionSet(object):
         modified, lest it affect the return values of future calls for the same
         chunk.
         """
-        crackx = x
-        crackz = z
+        
 
-        if offset:
-            if self.northdirection == UPPER_LEFT:
-                crackx = x + offset * 16
-                crackz = z - offset * 16
-            elif self.northdirection == UPPER_RIGHT:
-                crackx = x - offset * 16
-                crackz = z - offset * 16
-            elif self.northdirection == LOWER_LEFT:
-                crackx = x + offset * 16
-                crackz = z + offset * 16
-            else:
-                crackx = x - offset * 16
-                crackz = z + offset * 16
-
-        regionfile = self._get_region_path(crackx, y, crackz)
+        regionfile = self._get_region_path(x, y, z)
         if regionfile is None:
             return {}
             #raise ChunkDoesntExist("Chunk %s,%s doesn't exist (and neither does its region)" % (x,z))
@@ -1454,7 +1441,7 @@ class RegionSet(object):
         if data is None:
             return {}
             #raise ChunkDoesntExist("Chunk %s,%s doesn't exist" % (x,z))
-
+ 
         level = data[1]['Level']
         chunk_data = level
 
@@ -1654,19 +1641,8 @@ class RegionSet(object):
                 if abs(x) > 500000 or abs(y) > 500000:
                     logging.warning("Holy shit what is up with region file %s !?" % f)
                 if abs(x) < 100:
-                    #yield (x+y-22306, y, z-y+48815, os.path.join(self.regiondir, f))
+                    yield (x, y, z, os.path.join(self.regiondir, f))
 
-                    if self.northdirection == UPPER_LEFT:
-                        yield (x+y, y, z-y, os.path.join(self.regiondir, f))
-                    elif self.northdirection == UPPER_RIGHT:
-                        yield (x-y, y, z-y, os.path.join(self.regiondir, f))
-                        #yield (x-y-22306, y, z-y+48815, os.path.join(self.regiondir, f))
-                    elif self.northdirection == LOWER_LEFT:
-                        yield (x+y, y, z+y, os.path.join(self.regiondir, f))
-                    else:
-                        yield (x-y, y, z+y, os.path.join(self.regiondir, f))
-                # if y < 7:
-                #     yield (x, y, z, os.path.join(self.regiondir, f))
 
 class RegionSetWrapper(object):
     """This is the base class for all "wrappers" of RegionSet objects. A
@@ -1705,8 +1681,8 @@ class RegionSetWrapper(object):
         return self._r.get_type()
     def get_biome_data(self, x, y, z):
         return self._r.get_biome_data(x,y,z)
-    def get_chunk(self, x, y, z, offset = 0):
-        return self._r.get_chunk(x,y,z,offset)
+    def get_chunk(self, x, y, z):
+        return self._r.get_chunk(x,y,z)
     def iterate_chunks(self):
         return self._r.iterate_chunks()
     def iterate_newer_chunks(self,filemtime):
@@ -1764,10 +1740,10 @@ class RotatedRegionSet(RegionSetWrapper):
     def __setstate__(self, args):
         self.__init__(args[0], args[1])
 
-    def get_chunk(self, x, y, z, offset=0):
+    def get_chunk(self, x, y, z):
         
         x,z = self.unrotate(x,z)
-        chunk_data = dict(super(RotatedRegionSet, self).get_chunk(x,y,z,offset))
+        chunk_data = dict(super(RotatedRegionSet, self).get_chunk(x,y,z))
         newsections = []
 
         if "Sections" not in chunk_data:
@@ -1820,12 +1796,12 @@ class CroppedRegionSet(RegionSetWrapper):
         self.zmin = zmin//16
         self.zmax = zmax//16
 
-    def get_chunk(self,x,y,z, offset=0):
+    def get_chunk(self,x,y,z):
         if (
                 self.xmin <= x <= self.xmax and
                 self.zmin <= z <= self.zmax
                 ):
-            return super(CroppedRegionSet, self).get_chunk(x,y,z,offset)
+            return super(CroppedRegionSet, self).get_chunk(x,y,z)
         else:
             raise ChunkDoesntExist("This chunk is out of the requested bounds")
 
@@ -1884,7 +1860,7 @@ class CachedRegionSet(RegionSetWrapper):
 
         self.key = s
 
-    def get_chunk(self, x, y, z, offset=0):
+    def get_chunk(self, x, y, z):
         key = (self.key, x, y, z)
         for i, cache in enumerate(self.caches):
             try:
@@ -1896,7 +1872,7 @@ class CachedRegionSet(RegionSetWrapper):
             except KeyError:
                 pass
         else:
-            retval = super(CachedRegionSet, self).get_chunk(x,y,z,offset)
+            retval = super(CachedRegionSet, self).get_chunk(x,y,z)
 
         # Now add retval to all the caches that didn't have it, all the caches
         # up to and including index i

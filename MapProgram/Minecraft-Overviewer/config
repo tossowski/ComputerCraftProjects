@@ -1,11 +1,12 @@
 #worlds["My world"] = "/mnt/c/Users/tosso/AppData/Roaming/.minecraft/saves/Vanilla1_12"
-worlds["My world"] = "/mnt/c/Users/tosso/Desktop/AT/instances/MysticsCubicChunksModpack/saves/world"
+#worlds["My world"] = "/mnt/c/Users/tosso/Desktop/AT/instances/MysticsCubicChunksModpack/saves/OhHiMark"
+worlds["My world"] = "/mnt/c/Users/tosso/AppData/Roaming/.minecraft/saves/ZaNewWarudo"
 
 renders["normalrender"] = {
     "world": "My world",
     "title": "Normal Render of My World",
-    "northdirection": "upper-right",
+    "northdirection": "upper-left",
     "rendermode":smooth_lighting
 }
 
-outputdir = "./outputs"
+outputdir = "./testing12345"

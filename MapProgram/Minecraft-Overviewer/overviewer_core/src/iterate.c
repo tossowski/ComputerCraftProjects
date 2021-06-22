@@ -131,8 +131,6 @@ bool load_chunk(RenderState* state, int32_t x, int32_t y, int32_t z, uint8_t req
     PyObject* chunk = NULL;
     PyObject* sections = NULL;
     PyObject* section = NULL;
-    PyObject *args = NULL;  
-    PyObject *keywords = NULL;
 
 
 
@@ -161,26 +159,9 @@ bool load_chunk(RenderState* state, int32_t x, int32_t y, int32_t z, uint8_t req
     
     // load chunk below and above to make smooth lighting work
     for (i = -1; i < 2; i++) {
-        
-        if (start_y + i > 16 || start_y + i == 0) {
-            args = Py_BuildValue("iii", x, state->chunky + i, z);    
-            keywords = PyDict_New();
+        chunk = PyObject_CallMethod(state->regionset, "get_chunk", "iii", x, state->chunky + i, z);
 
-            if (start_y + i > 16) {
-                PyDict_SetItemString(keywords, "offset", PyLong_FromLong(1));
-            } else {
-                PyDict_SetItemString(keywords, "offset", PyLong_FromLong(-1));
-            }
-            
-
-            chunk = PyObject_Call(PyObject_GetAttrString(state->regionset, "get_chunk"), args, keywords);
-            Py_DECREF(args);
-            Py_DECREF(keywords);
-        } else {
-            chunk = PyObject_CallMethod(state->regionset, "get_chunk", "iii", x, state->chunky + i, z);
-        }
-        
-
+    
         if (chunk == NULL) {
                 // An exception is already set. RegionSet.get_chunk sets
                 // ChunkDoesntExist

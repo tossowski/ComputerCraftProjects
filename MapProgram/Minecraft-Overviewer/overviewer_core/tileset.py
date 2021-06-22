@@ -176,6 +176,10 @@ Bounds = namedtuple("Bounds", ("mincol", "maxcol", "minrow", "maxrow"))
 
 __all__ = ["TileSet"]
 
+UPPER_LEFT  = 0 ## - Return the world such that north is down the -Z axis (no rotation)
+UPPER_RIGHT = 1 ## - Return the world such that north is down the +X axis (rotate 90 degrees counterclockwise)
+LOWER_RIGHT = 2 ## - Return the world such that north is down the +Z axis (rotate 180 degrees)
+LOWER_LEFT  = 3 ## - Return the world such that north is down the -X axis (rotate 90 degrees clockwise)
 
 class TileSet(object):
     """The TileSet object manages the work required to produce a set of tiles
@@ -628,6 +632,9 @@ class TileSet(object):
 
         for c_x, c_y, c_z, _ in self.regionset.iterate_chunks():
             # Convert these coordinates to row/col
+
+            c_x, c_z = self._shift_x_and_z(c_x, c_y, c_z)
+
             col, row = convert_coords(c_x, c_z)
 
             minrow = min(minrow, row)
@@ -810,6 +817,30 @@ class TileSet(object):
                 if e.errno != errno.ENOENT:
                     raise
 
+
+    # Shift hack to work with cubic chunk. Shift x and z according to y
+    def _shift_x_and_z(self, x, y, z, opposite=False):
+        direction = self.options.get("northdirection", 0)
+        xoff = 0
+        zoff = 0
+        yoff = y // 16
+        if direction == UPPER_LEFT:
+            xoff = 1
+            zoff = -1
+        elif direction == UPPER_RIGHT:
+            xoff = -1
+            zoff = -1
+        elif direction == LOWER_RIGHT:
+            xoff = 1
+            zoff = 1
+        else:
+            xoff = -1
+            zoff = 1
+        
+        if opposite:
+            return x - 16 * xoff * yoff, z - 16 * zoff * yoff
+        return x + 16 * xoff * yoff, z + 16 * zoff * yoff
+
     def _chunk_scan(self):
         """Scans the chunks of this TileSet's world to determine which
         render-tiles need rendering. Returns a RendertileSet object.
@@ -859,6 +890,9 @@ class TileSet(object):
 
             if chunkmtime > max_chunk_mtime:
                 max_chunk_mtime = chunkmtime
+
+            
+            chunkx, chunkz = self._shift_x_and_z(chunkx, chunky, chunkz) 
 
             # Convert to diagonal coordinates
             chunkcol, chunkrow = convert_coords(chunkx, chunkz)
@@ -1048,9 +1082,11 @@ class TileSet(object):
 
         imgpath = tile.get_filepath(self.outputdir, self.imgextension)
 
+        dir = self.options.get("northdirection", 0)
+
         # Calculate which chunks are relevant to this tile
         # This is a list of (col, row, chunkx, chunkz, chunk_mtime)
-        chunks = list(get_chunks_by_tile(tile, self.regionset))
+        chunks = list(self.get_chunks_by_tile(tile, self.regionset))
 
         if not chunks:
             # No chunks were found in this tile
@@ -1084,12 +1120,14 @@ class TileSet(object):
 
         colstart = tile.col
         rowstart = tile.row
+
         # col colstart will get drawn on the image starting at x coordinates -(384/2)
         # row rowstart will get drawn on the image starting at y coordinates -(192/2)
-        max_chunk_mtime = 0
+        max_chunk_mtime = 0 
 
-            
         for col, row, chunkx, chunky, chunkz, chunk_mtime in chunks:
+
+                
             xpos = -192 + (col - colstart) * 192
             ypos = -96 + (row - rowstart) * 96 + (16 - 1 - chunky % 16) * 192
             if chunk_mtime > max_chunk_mtime:
@@ -1097,12 +1135,6 @@ class TileSet(object):
 
             # draw the chunk!
             try:
-                # if chunky != 0:
-                #     continue
-                # if chunkx == 54 and chunkz == 14:
-                # if chunky == 16:
-                #     print("Asdfasdfasdf")
-
                 c_overviewer.render_loop(
                     self.world, self.regionset, chunkx, chunky, chunkz, tileimg, xpos, ypos,
                     self.options['rendermode'], self.textures)
@@ -1177,7 +1209,8 @@ class TileSet(object):
                 tile_mtime = 0
 
             try:
-                max_chunk_mtime = max(c[5] for c in get_chunks_by_tile(tileobj, self.regionset))
+                dir = self.options.get("northdirection", 0)
+                max_chunk_mtime = max(c[5] for c in self.get_chunks_by_tile(self, tileobj, self.regionset))
             except ValueError:
                 # max got an empty sequence! something went horribly wrong
                 logging.warning("tile %s expected contains no chunks! this may be a bug", path)
@@ -1293,6 +1326,82 @@ class TileSet(object):
                 logging.debug("Found a subtree that shouldn't exist. Deleting it: %s", dirpath)
                 shutil.rmtree(dirpath)
 
+    def get_chunks_by_tile(self, tile, regionset):
+        """Get chunk sections that are relevant to the given render-tile. Only
+        returns chunk sections that are in chunks that actually exist according to
+        the given regionset object. (Does not check to see if the chunk section
+        itself within the chunk exists)
+
+        This function is expected to return the chunk sections in the correct order
+        for rendering, i.e. back to front.
+
+        Returns an iterator over chunks tuples where each item is
+        (col, row, chunkx, chunky, chunkz, mtime)
+        """
+
+        # This is not a documented usage of this function and is used only for
+        # debugging
+        if regionset is None:
+            def get_mtime(x, y, z):
+                return True
+        else:
+            get_mtime = regionset.get_chunk_mtime
+
+
+        MAX_REGION_Y = 15
+        eveniters = []
+        odditers = []
+
+
+
+        # First do the odd. For each chunk in the tile's odd column the tile
+        # "passes through" three chunk sections.
+        for k in range(MAX_REGION_Y):
+            oddcol_sections = []
+            for i, y in enumerate(reversed(range(16*k, 16*(k+1)))):
+                for row in range(tile.row + 3 - i * 2  , tile.row - 2 - i * 2, -2):
+                    oddcol_sections.append((tile.col + 1, row, y))
+
+            evencol_sections = []
+            for i, y in enumerate(reversed(range(16*k, 16*(k+1)))):
+                for row in range(tile.row + 4 - i * 2, tile.row - 3 - i * 2, -2):
+                    evencol_sections.append((tile.col + 2, row, y ))
+                    evencol_sections.append((tile.col, row, y))
+
+            eveniter = reversed(evencol_sections)
+            odditer = reversed(oddcol_sections)
+            eveniters.append(eveniter)
+            odditers.append(odditer)
+
+
+        # There are 4 rows of chunk sections per Y value on even columns, but 3
+        # rows on odd columns. This iteration order yields them in back-to-front
+        # order appropriate for rendering
+
+        for k in range(MAX_REGION_Y):
+            eveniter = eveniters[k]
+            odditer = odditers[k]
+            for col, row, y in roundrobin((
+                    eveniter, eveniter,
+                    odditer,
+                    eveniter, eveniter,
+                    odditer,
+                    eveniter, eveniter,
+                    odditer,
+                    eveniter, eveniter,)):
+
+
+                # Evil shift hack
+                chunkx, chunkz = unconvert_coords(col, row)
+                chunkx, chunkz = self._shift_x_and_z(chunkx, y, chunkz, opposite=True)
+
+                
+                mtime = get_mtime(chunkx, y, chunkz)
+                # if (tile.col == 0 and tile.row == 4):
+                #     print(chunkx, y, chunkz, mtime)
+                if mtime is not None:
+                    yield (col, row, chunkx, y, chunkz, mtime)
+
 
 #
 # Functions for converting (x, z) to (col, row) and back
@@ -1349,107 +1458,8 @@ def get_tiles_by_chunk(chunkcol, chunkrow):
     return product(colrange, rowrange)
 
 
-def get_chunks_by_tile(tile, regionset):
-    """Get chunk sections that are relevant to the given render-tile. Only
-    returns chunk sections that are in chunks that actually exist according to
-    the given regionset object. (Does not check to see if the chunk section
-    itself within the chunk exists)
-
-    This function is expected to return the chunk sections in the correct order
-    for rendering, i.e. back to front.
-
-    Returns an iterator over chunks tuples where each item is
-    (col, row, chunkx, chunky, chunkz, mtime)
-    """
 
 
-    # This is not a documented usage of this function and is used only for
-    # debugging
-    if regionset is None:
-        def get_mtime(x, y, z):
-            return True
-    else:
-        get_mtime = regionset.get_chunk_mtime
-
-    # Each tile has two even columns and an odd column of chunks.
-
-    MAX_REGION_Y = 15
-    eveniters = []
-    odditers = []
-
-
-
-    # First do the odd. For each chunk in the tile's odd column the tile
-    # "passes through" three chunk sections.
-    for k in range(MAX_REGION_Y):
-        oddcol_sections = []
-        for i, y in enumerate(reversed(range(16*k, 16*(k+1)))):
-            for row in range(tile.row + 3 - i * 2  , tile.row - 2 - i * 2, -2):
-                oddcol_sections.append((tile.col + 1, row, y))
-
-        evencol_sections = []
-        for i, y in enumerate(reversed(range(16*k, 16*(k+1)))):
-            for row in range(tile.row + 4 - i * 2, tile.row - 3 - i * 2, -2):
-                evencol_sections.append((tile.col + 2, row, y))
-                evencol_sections.append((tile.col, row, y))
-
-        eveniter = reversed(evencol_sections)
-        odditer = reversed(oddcol_sections)
-        eveniters.append(eveniter)
-        odditers.append(odditer)
-
-
-    # There are 4 rows of chunk sections per Y value on even columns, but 3
-    # rows on odd columns. This iteration order yields them in back-to-front
-    # order appropriate for rendering
-
-    for k in range(MAX_REGION_Y):
-        eveniter = eveniters[k]
-        odditer = odditers[k]
-        for col, row, y in roundrobin((
-                eveniter, eveniter,
-                odditer,
-                eveniter, eveniter,
-                odditer,
-                eveniter, eveniter,
-                odditer,
-                eveniter, eveniter,)):
-            chunkx, chunkz = unconvert_coords(col, row)
-
-
-            
-            mtime = get_mtime(chunkx, y, chunkz)
-            # if (tile.col == 0 and tile.row == 4):
-            #     print(chunkx, y, chunkz, mtime)
-            if mtime is not None:
-                # print(chunkx, chunkz, y)
-                # print(col, row, chunkx, chunkz)
-
-                    
-                yield (col, row, chunkx, y, chunkz, mtime)
-
-
-    # for col, row, y in roundrobin((
-    #         above_16_even, above_16_even,
-    #         above_16_odd,
-    #          above_16_even, above_16_even,
-    #         above_16_odd,
-    #          above_16_even, above_16_even,
-    #         above_16_odd,
-    #          above_16_even, above_16_even,)):
-    #     chunkx, chunkz = unconvert_coords(col, row)
-
-
-        
-    #     mtime = get_mtime(chunkx, y, chunkz)
-    #     # if (tile.col == 0 and tile.row == 4):
-    #     #     print(chunkx, y, chunkz, mtime)
-    #     if mtime is not None:
-    #         # print(chunkx, chunkz, y)
-    #         # print(col, row, chunkx, chunkz)
-
-                
-    #         yield (col, row, chunkx, y, chunkz, mtime)
 
 
 class RendertileSet(object):
