@@ -2,7 +2,7 @@ This repository contains the code used to program ComputerCraft turtles to build
 
 <img src="Pictures/DragonShaders.png" height="200"> <img src="Pictures/BulbasaurIvysaur.png" height="200">
 
-The repository also contains a customized isometric map viewer which can render cubic chunks worlds (WIP). More details on this in the MapProgram folder. Here is an example render:
+There is a separate repository which contains the code that can render cubic chunks worlds (WIP). You can find it [here](https://github.com/tossowski/CubicChunksMapViewer). Here is an example render:
 
 <img src="Pictures/MapExample.png" height="300"> 
 
