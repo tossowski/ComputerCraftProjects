@@ -272,6 +272,11 @@ class RegionSet(object):
         """
         self.regiondir = os.path.normpath(regiondir)
         self.rel = os.path.normpath(rel)
+
+        # Helps keep track of which y levels need to be rendered
+        # in each render tile. In CC worlds, as region y increases,
+        # the chunks bleed into other render tiles.
+        self.tile_level_map = {}
         logging.debug("regiondir is %r" % self.regiondir)
         logging.debug("rel is %r" % self.rel)
 
@@ -291,19 +296,24 @@ class RegionSet(object):
 
         # This is populated below. It is a mapping from (x,y) region coords to filename
         self.regionfiles = {}
+        raw_region_files = {}
 
         # This holds a cache of open regionfile objects
         self.regioncache = cache.LRUCache(size=16, destructor=lambda regionobj: regionobj.close())
 
+        min_region_y = float("inf")
         for x, y, z,  regionfile in self._iterate_regionfiles():
             # regionfile is a pathname
             if os.path.getsize(regionfile) != 0:
-                self.regionfiles[(x,y,z)] = (regionfile, os.path.getmtime(regionfile))
+                raw_region_files[(x,y,z)] = (regionfile, os.path.getmtime(regionfile))
+                min_region_y = min(min_region_y, y)
             else:
                 logging.debug("Skipping zero-size region file {}".format(regionfile))
 
         # Modify region file dict keys so the lowest y region file has y = 0
-        
+        for x, y, z in raw_region_files.keys():
+            val = raw_region_files[(x,y,z)]
+            self.regionfiles[(x,y-min_region_y,z)] = val
 
 
         self.empty_chunk = [None,None]
@@ -1659,6 +1669,7 @@ class RegionSetWrapper(object):
     """
     def __init__(self, rsetobj):
         self._r = rsetobj
+        self.tile_level_map = rsetobj.tile_level_map
 
     @property
     def regiondir(self):

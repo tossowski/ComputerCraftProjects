@@ -633,9 +633,9 @@ class TileSet(object):
         for c_x, c_y, c_z, _ in self.regionset.iterate_chunks():
             # Convert these coordinates to row/col
 
-            c_x, c_z = self._shift_x_and_z(c_x, c_y, c_z)
+            a, b = self._shift_x_and_z(c_x, c_y, c_z, direction=UPPER_LEFT)
 
-            col, row = convert_coords(c_x, c_z)
+            col, row = convert_coords(a, b)
 
             minrow = min(minrow, row)
             maxrow = max(maxrow, row)
@@ -819,8 +819,9 @@ class TileSet(object):
 
 
     # Shift hack to work with cubic chunk. Shift x and z according to y
-    def _shift_x_and_z(self, x, y, z, opposite=False):
-        direction = self.options.get("northdirection", 0)
+    def _shift_x_and_z(self, x, y, z, direction=None):
+        if direction is None:
+            direction = self.options.get("northdirection", 0)
         xoff = 0
         zoff = 0
         yoff = y // 16
@@ -830,15 +831,13 @@ class TileSet(object):
         elif direction == UPPER_RIGHT:
             xoff = -1
             zoff = -1
-        elif direction == LOWER_RIGHT:
+        elif direction == LOWER_LEFT:
             xoff = 1
             zoff = 1
         else:
             xoff = -1
             zoff = 1
-        
-        if opposite:
-            return x - 16 * xoff * yoff, z - 16 * zoff * yoff
+
         return x + 16 * xoff * yoff, z + 16 * zoff * yoff
 
     def _chunk_scan(self):
@@ -892,7 +891,7 @@ class TileSet(object):
                 max_chunk_mtime = chunkmtime
 
             
-            chunkx, chunkz = self._shift_x_and_z(chunkx, chunky, chunkz) 
+            chunkx, chunkz = self._shift_x_and_z(chunkx, chunky, chunkz, direction=UPPER_LEFT) 
 
             # Convert to diagonal coordinates
             chunkcol, chunkrow = convert_coords(chunkx, chunkz)
@@ -912,6 +911,12 @@ class TileSet(object):
 
                 # Computes the path in the quadtree from the col,row coordinates
                 tile = RenderTile.compute_path(c, r, depth)
+
+                key = (tile.row, tile.col)
+                if key in self.regionset.tile_level_map:
+                    self.regionset.tile_level_map[key].add(chunky//16)
+                else:
+                    self.regionset.tile_level_map[key] = set([chunky//16])
 
                 if markall:
                     # markall mode: Skip all other checks, mark tiles
@@ -1011,8 +1016,6 @@ class TileSet(object):
             return
 
         # Create the actual image now
-        # Original:
-        # img = Image.new("RGBA", (384, 384), self.options['bgcolor'])
         img = Image.new("RGBA", (384, 384), self.options['bgcolor'])
 
         # We'll use paste (NOT alpha_over) for quadtree generation because
@@ -1025,8 +1028,6 @@ class TileSet(object):
                     src = src.convert("RGBA")
                 src.load()
 
-                # Original
-                # quad = Image.new("RGBA", (192, 192), self.options['bgcolor'])
 
                 quad = Image.new("RGBA", (192, 192), self.options['bgcolor'])
                 resize_half(quad, src)
@@ -1347,16 +1348,14 @@ class TileSet(object):
         else:
             get_mtime = regionset.get_chunk_mtime
 
-
-        MAX_REGION_Y = 15
+        y_levels = sorted(regionset.tile_level_map[(tile.row, tile.col)])
         eveniters = []
         odditers = []
 
 
-
         # First do the odd. For each chunk in the tile's odd column the tile
         # "passes through" three chunk sections.
-        for k in range(MAX_REGION_Y):
+        for k in y_levels:
             oddcol_sections = []
             for i, y in enumerate(reversed(range(16*k, 16*(k+1)))):
                 for row in range(tile.row + 3 - i * 2  , tile.row - 2 - i * 2, -2):
@@ -1378,7 +1377,7 @@ class TileSet(object):
         # rows on odd columns. This iteration order yields them in back-to-front
         # order appropriate for rendering
 
-        for k in range(MAX_REGION_Y):
+        for k in range(len(y_levels)):
             eveniter = eveniters[k]
             odditer = odditers[k]
             for col, row, y in roundrobin((
@@ -1393,7 +1392,7 @@ class TileSet(object):
 
                 # Evil shift hack
                 chunkx, chunkz = unconvert_coords(col, row)
-                chunkx, chunkz = self._shift_x_and_z(chunkx, y, chunkz, opposite=True)
+                chunkx, chunkz = self._shift_x_and_z(chunkx, y, chunkz, direction=LOWER_RIGHT)
 
                 
                 mtime = get_mtime(chunkx, y, chunkz)
@@ -1746,6 +1745,10 @@ class RenderTile(object):
 
     def __setstate__(self, state):
         self.__init__(*state)
+
+    def add_y_level(self, y):
+        if y not in self.y_levels:
+            self.y_levels.append(y_level)
 
     def get_filepath(self, tiledir, imgformat):
         """Returns the path to this file given the directory to the tiles
